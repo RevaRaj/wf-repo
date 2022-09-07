@@ -1,0 +1,89 @@
+I've used CTE's(Common Table Expressions) to make the query easily readable and understandable.
+
+------------------------------------------------------------------------------------------------------------------------------
+--  Question1:   We want to list the names and gold medal count of all athletes with three or more gold medals over all games, 
+--               starting with the ones with the most gold medals.
+------------------------------------------------------------------------------------------------------------------------------
+
+        
+        -- Collecting total gold medal by each athlete in summber and winter games
+
+		with winter_summer as (
+			select a.id, a.name,sum(sg.gold) as gold_medal  from athletes a 
+			inner join summer_games sg on a.id= sg.athlete_id
+			group by a.id
+			
+			union all
+			
+			select a.id, a.name,sum(wg.gold) as gold_medal from athletes a 
+			inner join winter_games wg  on a.id= wg.athlete_id
+			group by a.id
+		)
+
+
+		-- Filtering the athletes based on their gold medal count with atleast 3 and highest god medal athelete at the top
+
+			select name,gold_medal as golde_medal_count from winter_summer 
+			group by id 
+			having sum(gold_medal)>=3
+			order by gold_medal desc
+
+---------------------------------------------------------------------------------------------------------------------------------
+--  Question2:  For each region, we want to show the region average of the second tallest athlete of each country over all games.
+---------------------------------------------------------------------------------------------------------------------------------
+
+        --	Collecting all the athelets and their country details
+
+		with athlete_country as (
+
+            select sg.athlete_id, sg.country_id  from summer_games sg 
+
+            union
+
+            select wg.athlete_id, wg.country_id  from winter_games wg 
+
+		),
+
+		-- Based on the country details of the atheletes gathering their region and height
+
+		athlete_height as (
+
+            select ac.athlete_id, ac.country_id,c.region, a.height from athlete_country ac
+            inner join athletes a on a.id =ac.athlete_id
+            inner join countries c on ac.country_id = c.id
+
+		),
+
+		--	Ordering the athlets based on their height 
+
+		height_ranking as (
+
+			select * , row_number() over  (partition by country_id
+										  order by height desc) as rank
+			from athlete_height
+
+		),
+
+
+		-- fetching the 2nd tallest athlete
+
+		second_tallest as (
+
+			select athlete_id, height,country_id, region
+			from height_ranking where rank=2
+
+		),
+
+		--	Calculating number of 2nd tallest athletes in each region
+
+		athlete_count_region as (
+
+			select count(athlete_id) as athlete_count,region  from second_tallest
+			group by region
+			
+		)
+
+		-- Finding the regional average which is 16
+		 
+			select sum(athlete_count)/count(region) as region_avg
+			from athlete_count_region;
